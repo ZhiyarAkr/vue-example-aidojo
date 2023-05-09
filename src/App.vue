@@ -1,18 +1,51 @@
 <template>
   <div
-    class="flex flex-col justify-between h-screen w-screen bg-gray-900 no-scrollbar::-webkit-scrollbar no-scrollbar content"
+    class="container flex flex-col justify-between h-screen w-screen bg-gray-900 no-scrollbar::-webkit-scrollbar no-scrollbar content"
   >
-    <ul class="flex-1 ml-0 pb-[6rem]" :class="{ 'ml-5': !isMobile }">
-      <li v-for="(item, index) in messages" class="flex">
-        <ChatBubble
-          :name="item.name"
-          :isMe="item.isMe"
-          :message="item.message"
-          :avatarUrl="item.avatarUrl"
-          :time="item.time"
-        ></ChatBubble>
-      </li>
-    </ul>
+    <div class="flex">
+      <div class="flex flex-col">
+        <div
+          v-for="(user, index) in users"
+          class="flex p-2 border-2 border-transparent"
+          :class="{
+            'bg-gray-800': selectedConversation == index,
+            'hover:cursor-pointer hover:border-2 hover:border-cyan-300 duration-100':
+              !isMobile,
+          }"
+          @click="setSelectedConversation(index)"
+        >
+          <img
+            class="w-8 h-8 rounded-full border-cyan-300 border-2"
+            :src="user.avatarUrl"
+            alt="avatar"
+          />
+          <p
+            class="font-bold text-gray-100 ml-2 self-center"
+            :class="{ 'text-xxsm': isMobile }"
+          >
+            {{ user.name }}
+          </p>
+        </div>
+      </div>
+
+      <ul
+        class="flex-1 flex-col bg-gray-800 rounded-md pb-[6rem]"
+        :class="{ 'p-4': !isMobile }"
+      >
+        <li
+          v-for="(item, index) in conversations[selectedConversation]"
+          class="flex text-white"
+        >
+          <ChatBubble
+            :name="users[item.userId] ? users[item.userId].name : ''"
+            :isMe="checkIfMe(item)"
+            :message="item.content"
+            :avatarUrl="users[item.userId] ? users[item.userId].avatarUrl : ''"
+            :time="item.time"
+          ></ChatBubble>
+        </li>
+      </ul>
+    </div>
 
     <div class="flex justify-between">
       <input
@@ -25,7 +58,7 @@
         :class="{ 'hover:opacity-80 duration-200': !isMobile }"
         @click="sendMessage"
       >
-        send
+        Send
       </button>
     </div>
   </div>
@@ -33,40 +66,71 @@
 
 <script setup>
 import ChatBubble from "./components/ChatBubble.vue";
-import { ref, onMounted } from "vue";
+import { ref, onMounted, computed } from "vue";
 
-const messages = ref([
+const selectedConversation = ref(0);
+
+const users = ref([
   {
     name: "John Doe",
     avatarUrl: "https://randomuser.me/api/portraits/men/1.jpg",
-    message:
-      "Hello, World!!!!!!! !!!!!! !!!!!! !!!!! !!!!! !!!!! !!!! !!!!!!!!! !!!!!! !!!!! !!!!!",
-    isMe: false,
-    time: getTime(),
   },
   {
-    name: "",
-    avatarUrl: "",
-    message: "How are you today",
-    isMe: true,
-    time: getTime(),
+    name: "كرار محمد",
+    avatarUrl: "https://randomuser.me/api/portraits/men/4.jpg",
   },
   {
-    name: "Jane Smith",
-    avatarUrl: "https://randomuser.me/api/portraits/women/3.jpg",
-    message: "Hello There",
-    isMe: false,
-    time: getTime(),
-  },
-  {
-    name: "",
-    avatarUrl: "",
-    message:
-      "Testing overflowwww wwwww wwww wwwww wwwww wwwwwwww wwwww wwwww wwwwwww ",
-    isMe: true,
-    time: getTime(),
+    name: "ژیار عقراوي",
+    avatarUrl: "https://randomuser.me/api/portraits/men/6.jpg",
   },
 ]);
+
+const conversations = ref([
+  [
+    {
+      userId: 0,
+      content: "Hi, how are doing",
+      time: getTime(),
+    },
+    {
+      userId: null,
+      content: "Good, and you",
+      time: getTime(),
+    },
+  ],
+  [
+    {
+      userId: 1,
+      content: "مرحبا, شونك",
+      time: getTime(),
+    },
+    {
+      userId: null,
+      content: "الحمدلله, انت شونك",
+      time: getTime(),
+    },
+  ],
+  [
+    {
+      userId: 2,
+      content: "چەوانی باشی",
+      time: getTime(),
+    },
+    {
+      userId: null,
+      content: "ئەز باشم، تۆ چەوانی",
+      time: getTime(),
+    },
+  ],
+]);
+
+function checkIfMe(message) {
+  return message.userId == null;
+}
+
+function setSelectedConversation(index) {
+  selectedConversation.value = index;
+}
 
 const message = ref("");
 const isMobile = ref(false);
@@ -83,11 +147,9 @@ function sendMessage() {
   let trimmedMessage = message.value.trim();
   if (trimmedMessage === "") return;
 
-  messages.value.push({
-    name: "",
-    avatarUrl: "",
-    message: trimmedMessage,
-    isMe: true,
+  conversations.value[selectedConversation.value].push({
+    name: null,
+    content: trimmedMessage,
     time: getTime(),
   });
   message.value = "";
@@ -127,6 +189,10 @@ body {
 .no-scrollbar {
   -ms-overflow-style: none; /* IE and Edge */
   scrollbar-width: none; /* Firefox */
+}
+
+.text-xxsm {
+  font-size: 0.6rem;
 }
 
 @media (max-width: 1080px) {

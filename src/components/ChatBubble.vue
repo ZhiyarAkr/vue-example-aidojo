@@ -1,13 +1,13 @@
 <template>
-  <div class="mt-5 mobile-right" :class="{ 'ml-auto mr-2': isMe }">
+  <div :class="{ 'ml-auto': isMe }">
     <div class="flex">
       <img
         v-if="!isMe"
-        class="w-14 h-14 rounded-full mobile-left border-cyan-300 border-2"
+        class="w-14 h-14 rounded-full border-cyan-300 border-2"
         :src="avatarUrl"
         alt="avatar"
       />
-      <div class="flex flex-col mobile-left">
+      <div class="flex flex-col">
         <p v-if="!isMe" class="font-bold text-gray-100 ml-2">
           {{ name }}
         </p>
@@ -15,7 +15,7 @@
           class="break-words bg-[#12e675] max-w-sm px-4 py-2 rounded-lg text-gray-300"
           :class="{
             'text-gray-900 rounded-tr-none': isMe,
-            'bg-gray-800 rounded-tl-none': !isMe,
+            'bg-gray-700 rounded-tl-none m-1': !isMe,
           }"
         >
           {{ message }}
@@ -52,13 +52,6 @@ const props = defineProps({
     font-size: 14px;
     max-width: 100%;
     word-break: break-word;
-  }
-
-  .mobile-right {
-    margin-right: 0.25rem;
-  }
-  .mobile-left {
-    margin-left: 0.25rem;
   }
 }
 </style>
