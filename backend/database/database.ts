@@ -5,9 +5,9 @@ const chatDataSource = new DataSource({
   host: "localhost",
   type: "postgres",
   port: 5432,
-  database: "akz",
-  username: "postgres",
-  password: "1234",
+  database: "",
+  username: "",
+  password: "",
   entities: [
     User,
     ChatMessage,
