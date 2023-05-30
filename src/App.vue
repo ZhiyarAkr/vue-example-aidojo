@@ -8,15 +8,21 @@
           v-for="(user, index) in users"
           class="flex p-2 border-2 border-transparent"
           :class="{
-            'bg-gray-800': selectedConversation == index,
+            'bg-gray-800': selectedUserId == user.id,
             'hover:cursor-pointer hover:border-2 hover:border-cyan-300 duration-100':
               !isMobile,
           }"
-          @click="setSelectedConversation(index)"
+          @click="
+            {
+              setSelectedUserId(user.id);
+              setSelectedUser(user);
+              loadMessagesOfUser(user.id);
+            }
+          "
         >
           <img
             class="w-8 h-8 rounded-full border-cyan-300 border-2"
-            :src="user.avatarUrl"
+            :src="getUrl(user.profileBackDropPath)"
             alt="avatar"
           />
           <p
@@ -32,16 +38,16 @@
         class="flex-1 flex-col bg-gray-800 rounded-md pb-[6rem]"
         :class="{ 'p-4': !isMobile }"
       >
-        <li
-          v-for="(item, index) in conversations[selectedConversation]"
-          class="flex text-white"
-        >
+        <li v-for="(item, index) in conversations" class="flex text-white">
           <ChatBubble
-            :name="users[item.userId] ? users[item.userId].name : ''"
+            :name="selectedUser.name"
             :isMe="checkIfMe(item)"
             :message="item.content"
-            :avatarUrl="users[item.userId] ? users[item.userId].avatarUrl : ''"
-            :time="item.time"
+            :avatarUrl="getUrl(selectedUser.profileBackDropPath)"
+            :time="getTime(item.date)"
+            :id="item.id"
+            @onDelete="deleteMessage"
+            @onEdit="editMessage"
           ></ChatBubble>
         </li>
       </ul>
@@ -52,11 +58,12 @@
         class="fixed right-10 z-90 bottom-10 left-5 bg-gray-700 py-3 rounded-lg pl-2 outline-none text-gray-300"
         placeholder="type something"
         v-model="message"
+        @keyup.enter="sendMessage(selectedUserId)"
       />
       <button
         class="fixed z-90 bottom-10 right-4 bg-[#12e675] p-3 px-4 rounded-lg"
         :class="{ 'hover:opacity-80 duration-200': !isMobile }"
-        @click="sendMessage"
+        @click="sendMessage(selectedUserId)"
       >
         Send
       </button>
@@ -67,98 +74,130 @@
 <script setup>
 import ChatBubble from "./components/ChatBubble.vue";
 import { ref, onMounted, computed } from "vue";
+import axios from "axios";
 
-const selectedConversation = ref(0);
+const selectedUserId = ref(1);
+const selectedUser = ref();
 
-const users = ref([
-  {
-    name: "John Doe",
-    avatarUrl: "https://randomuser.me/api/portraits/men/1.jpg",
-  },
-  {
-    name: "كرار محمد",
-    avatarUrl: "https://randomuser.me/api/portraits/men/4.jpg",
-  },
-  {
-    name: "ژیار عقراوي",
-    avatarUrl: "https://randomuser.me/api/portraits/men/6.jpg",
-  },
-]);
+const users = ref([]);
 
-const conversations = ref([
-  [
-    {
-      userId: 0,
-      content: "Hi, how are doing",
-      time: getTime(),
-    },
-    {
-      userId: null,
-      content: "Good, and you",
-      time: getTime(),
-    },
-  ],
-  [
-    {
-      userId: 1,
-      content: "مرحبا, شونك",
-      time: getTime(),
-    },
-    {
-      userId: null,
-      content: "الحمدلله, انت شونك",
-      time: getTime(),
-    },
-  ],
-  [
-    {
-      userId: 2,
-      content: "چەوانی باشی",
-      time: getTime(),
-    },
-    {
-      userId: null,
-      content: "ئەز باشم، تۆ چەوانی",
-      time: getTime(),
-    },
-  ],
-]);
+const conversations = ref([]);
 
 function checkIfMe(message) {
-  return message.userId == null;
+  return message.userId == 0;
 }
 
-function setSelectedConversation(index) {
-  selectedConversation.value = index;
+const response = ref();
+
+function setSelectedUserId(id) {
+  selectedUserId.value = id;
 }
+
+function setSelectedUser(user) {
+  selectedUser.value = user;
+}
+
+const getUrl = (backdropPath) => {
+  return `https://randomuser.me/api/portraits/men/${backdropPath}`;
+};
 
 const message = ref("");
 const isMobile = ref(false);
 
-const checkIfMobile = () => {
+const loadUsers = async () => {
+  try {
+    let res = (await axios.get("http://localhost:3000/chat/user")).data;
+    res.forEach((element) => {
+      if (element.id != 0) {
+        users.value.push(element);
+        if (element.id == 1) {
+          selectedUser.value = element;
+        }
+      }
+    });
+  } catch (e) {}
+};
+
+const loadMessages = async () => {
+  try {
+    let res = (await axios.get("http://localhost:3000/chat/message/1")).data;
+    res.forEach((element) => {
+      conversations.value.push(element);
+    });
+  } catch (e) {}
+};
+
+const loadMessagesOfUser = async (id) => {
+  conversations.value = [];
+  try {
+    let res = (await axios.get(`http://localhost:3000/chat/message/${id}`))
+      .data;
+    let res2 = (await axios.get("http://localhost:3000/chat/message/0")).data;
+    res.forEach((element) => {
+      conversations.value.push(element);
+    });
+    res2.forEach((element) => {
+      if (element.toUserId == id) {
+        conversations.value.push(element);
+      }
+    });
+    conversations.value.sort((a, b) => {
+      return new Date(a.date) - new Date(b.date);
+    });
+  } catch (e) {}
+};
+
+const initilize = () => {
   if (window.innerWidth <= 1080) {
     isMobile.value = true;
   }
+  loadUsers();
+  loadMessagesOfUser(selectedUserId.value);
 };
 
-onMounted(checkIfMobile);
+onMounted(initilize);
 
-function sendMessage() {
+const sendMessage = async (userId) => {
+  let trimmedMessage = message.value.trim();
+  if (trimmedMessage === "") return;
+  const body = {
+    userId: 0,
+    content: trimmedMessage,
+    toUserId: userId,
+  };
+
+  try {
+    await axios.post("http://localhost:3000/chat/message", body);
+  } catch (e) {}
+  message.value = "";
+  loadMessagesOfUser(userId);
+};
+
+const deleteMessage = async (id) => {
+  try {
+    await axios.delete(`http://localhost:3000/chat/message/${id}`);
+    loadMessagesOfUser(selectedUserId.value);
+  } catch (e) {}
+};
+
+const editMessage = async (id) => {
   let trimmedMessage = message.value.trim();
   if (trimmedMessage === "") return;
 
-  conversations.value[selectedConversation.value].push({
-    name: null,
-    content: trimmedMessage,
-    time: getTime(),
-  });
-  message.value = "";
-}
+  try {
+    await axios.patch(`http://localhost:3000/chat/message/${id}`, {
+      content: trimmedMessage,
+    });
 
-function getTime() {
-  const dateObj = new Date();
-  let hours = dateObj.getHours();
-  let minutes = dateObj.getMinutes();
+    message.value = "";
+    loadMessagesOfUser(selectedUserId.value);
+  } catch (e) {}
+};
+
+function getTime(dbDate) {
+  let date = new Date(dbDate);
+  let hours = date.getHours();
+  let minutes = date.getMinutes();
   const amPm = hours >= 12 ? "PM" : "AM";
   hours = hours % 12 || 12;
   minutes = minutes < 10 ? "0" + minutes : minutes;

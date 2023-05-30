@@ -8,9 +8,24 @@
         alt="avatar"
       />
       <div class="flex flex-col">
-        <p v-if="!isMe" class="font-bold text-gray-100 ml-2">
-          {{ name }}
-        </p>
+        <div class="flex">
+          <p v-if="!isMe" class="font-bold text-gray-100 ml-2">
+            {{ name }}
+          </p>
+          <p
+            class="text-red-300 hover:cursor-pointer hover:underline"
+            :class="{ 'ml-5': !isMe }"
+            @click="onDelete"
+          >
+            Delete
+          </p>
+          <p
+            class="text-blue-300 hover:cursor-pointer hover:underline ml-2"
+            @click="onEdit"
+          >
+            Edit
+          </p>
+        </div>
         <p
           class="break-words bg-[#12e675] max-w-sm px-4 py-2 rounded-lg text-gray-300"
           :class="{
@@ -35,7 +50,18 @@ const props = defineProps({
   message: String,
   isMe: Boolean,
   time: String,
+  id: Number,
 });
+
+const emit = defineEmits(["onDelete", "onEdit"]);
+
+const onDelete = () => {
+  emit("onDelete", props.id);
+};
+
+const onEdit = () => {
+  emit("onEdit", props.id);
+};
 </script>
 
 <style scoped>
