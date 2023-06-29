@@ -1,12 +1,15 @@
 import express from "express";
 import { attachControllers } from "@decorators/express";
-import { ChatMessage, User } from "./database/chat";
+import ChatMessage from "./database/ChatMessage";
+import User from "./database/User";
+import Conversation from "./database/Conversation";
 
 import cors from "cors";
 import ChatController from "./controllers/chat";
+import AuthController from "./controllers/authController";
 import database from "./database/database"
 import "reflect-metadata"
-import { DataSource } from "typeorm";
+import {generateToken, hash, verify} from "./util/hash";
 
 const app = express();
 app.use(express.json());
@@ -18,76 +21,75 @@ const port = 3000;
 
 const checkIfNotPopulated = async () => {
   try {
-    let users = await User.find()
-    if (users.length > 0) {
+    let conversations = await Conversation.find()
+    if (conversations.length > 0) {
       return;
     } else {
-        let user1 = new User();
-        let uesr2 = new User();
-        let user3 = new User();
-        user1.id = 1;
-        uesr2.id = 2;
-        user3.id = 0;
-        user1.name = "John Doe";
-        uesr2.name = "David Johnson";
-        user3.name = "";
-        user1.profileBackDropPath = "1.jpg";
-        uesr2.profileBackDropPath = "4.jpg";
-        user3.profileBackDropPath = "";
-
-        let message1 = new ChatMessage();
+        let user = new User();
+        let user2 = new User();
+        let conversation = new Conversation();
+        let conversation2 = new Conversation();
+        let message = new ChatMessage();
         let message2 = new ChatMessage();
-        let message3 = new ChatMessage();
-        let message4 = new ChatMessage();
+        user2.firstName = "Alex";
+        user2.lastName = "Smith";
+        user2.profileBackDropPath = "6.jpg";
+        user2.username = "AlexSmith10";
+        user2.password = await hash("Alex_Smith_password");
+        user2.authToken = generateToken({firstName: user2.firstName, lastName: user2.lastName, id: user2.id});
+        user.firstName = "John";
+        user.lastName = "Doe";
+        user.profileBackDropPath = "1.jpg";
+        user.username = "JohnDoe10";
+        user.password = await hash("John_Doe_password");
+        user.authToken = generateToken({firstname: user.firstName, lastName: user.lastName, id: user.id});
 
-        message1.content = "Hi";
-        message1.userId = 1;
-        message1.toUserId = 0;
-        message2.content = "Hello";
-        message2.userId = 2;
-        message2.toUserId = 0;
-        message3.userId = 0;
-        message3.content = "to first user";
-        message3.toUserId = 1;
-        message4.userId = 0;
-        message4.content = "to second user";
-        message4.toUserId = 2;
+        message.content = "Hi";
+        message2.content = "Hello There";
+
+        user.messages = [message];
+        user.conversations = [conversation];
+        user2.messages = [message2];
+        user2.conversations = [conversation2];
+        conversation2.messages = [message2];
+        conversation2.users = [user2];
+        conversation.messages = [message];
+        conversation.users = [user];
+        message2.user = user2;
+        message2.conversation = conversation2;
+        message.user = user;
+        message.conversation = conversation;
+        
+
+        
+        
         try {
-          await User.save(user1);
-          await User.save(uesr2);
-          await User.save(user3);
-          await ChatMessage.save(message1);
+          await User.save(user);
+          await User.save(user2);
+          await Conversation.save(conversation);
+          await Conversation.save(conversation2);
+          await ChatMessage.save(message);
           await ChatMessage.save(message2);
-          await ChatMessage.save(message3);
-          await ChatMessage.save(message4);
         } catch(e) {
           console.log(e)
         }
-
-      
     }
   } catch(e) {
     console.log(e);
   }
 }
 
-attachControllers(app, [ChatController])
+const launch = async () => {
 
-
-database.initialize()
-  .then(connection => {
-    return checkIfNotPopulated();
+  await database.initialize();
+  await checkIfNotPopulated();  
+  await attachControllers(app, [AuthController, ChatController]);
+  app.listen(port, () => {
+    console.log(`The app is listening on port http://localhost:${port}`);
   })
-  .then(() => {
-    app.listen(port, () => {
-      console.log(`The app is listening on port http://localhost:${port}`);
-    });
-  })
-  .catch(error => {
-    console.error('An error occurred:', error);
-  })
+}
 
-
+launch();
 
 
 

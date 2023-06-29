@@ -1,112 +1,167 @@
 
 import { Controller, Get, Req, Res, Post, Patch, Delete, Options } from "@decorators/express"
 import { Request, Response } from "express";
-import { ChatMessage, User } from "../database/chat";
-import { Equal } from "typeorm";
+import User from "../database/User";
+import Conversation from "../database/Conversation";
+import ChatMessage from "../database/ChatMessage";
+import { Equal, Not, } from "typeorm";
+import authMiddleware, { RequestWithUser } from "../middlewares/authMiddleware";
+import { json } from "body-parser";
 
-
-@Controller("/chat")
-class ChatController {
-
-  @Get("/")
-  typeSomeResponse(@Res() res: Response) {
-    res.json("Wroking");
-  }
+// @ts-ignore
+@Controller("/chat", [authMiddleware])
+export default class ChatController {
 
   @Get("/user")
-  async getAllUsers(@Res() res: Response) {
+  async getAllUsers(@Req() req: RequestWithUser, @Res() res: Response) {
+
     try {
-      let users = await User.find();
-      res.json(users)
+      let users = await User.findBy(
+        {
+          id: Not(req.user.id)
+        }
+      );
+      return res.json(users)
     } catch(e) {
-      console.log(e)
+      return res.status(401).json({
+        message: "not found"
+      })
     }
   }
 
-  @Get("/message")
-  async getAllMessages(@Res() res: Response) {
+  @Get("/:conversationId/message")
+  async getAllMessages(@Req() req: RequestWithUser, @Res() res: Response) {
     try {
-      let messages = await ChatMessage.find()
-      res.json(messages)
+      const id = Number(req.params.conversationId)
+      let messages = await ChatMessage.findBy(
+        {
+          conversation: Equal(id)
+        }
+      )
+      return  res.json(messages)
     } catch(e) {
-      console.log(e)
+      return res.status(404).json({
+        message: "not found"
+      })
     }
   }
 
-  @Get("/message/:userId")
-  async getAllMessagesOfUser(@Req() req: Request, @Res() res: Response) {
+  @Get("/:userId/message")
+  async getAllMessagesOfUser(@Req() req: RequestWithUser, @Res() res: Response) {
     const userId = Number(req.params.userId)
     try {
           let userMessages = await ChatMessage.findBy(
         {
-          userId: Equal(userId)
+          user: Equal(userId)
         }
       );
-      res.json(userMessages);
+      return res.json(userMessages);
     } catch(e) {
-      res.status(404)
-      console.log(e)
+      return res.status(404).json({
+        message: "not found"
+      })
     }
   }
 
-  @Post("/message")
-  async addMessage(@Req() req: Request, @Res() res: Response) {
-      let message = new ChatMessage()
-      message.userId = req.body.userId;
-      message.content = req.body.content;
-      message.toUserId = req.body.toUserId;
-      try {
-        await ChatMessage.save(message);
-        res.json({
-          success: true
-        })
-      } catch(e) {
-        console.log(e)
-      }
-  }
+  @Patch("/:conversationId/me")
+    async addUserToConversation(@Req() req: RequestWithUser, @Res() res: Response) {
+        try {
+            let id = Number(req.params.conversationId);
+            let user = await User.findOneBy({
+                id: req.user.id
+            });
 
-  @Delete("/message/:id")
-  async deleteMessage(@Req() req: Request, @Res() res: Response) {
-    try {
-      const numberId = Number(req.params.id);
-      let toDelete = await ChatMessage.findOneBy(
-        {
-            id: Equal(numberId),
+            
+
+            let conversation = await Conversation.findOne(
+                {
+                  where: {
+                    id: id 
+                  },
+                  relations: {
+                    users: true
+                  }
+                }
+            )
+            if (conversation == null) {
+                return res.status(404).json({
+                    message: "something went wrong"
+                })
+            }
+            let users = conversation.users;
+            if (user != null) {
+              users.push(user)
+            }
+            
+            conversation.users = users;
+            await Conversation.save(conversation);
+            return res.json({
+              conversation: conversation
+            })
+
+        } catch(e) {
+          return res.status(404).json({
+            message: "something went wrong"
+          })
         }
-      );
-      if (toDelete == null) {
-        return res.status(404);
-      }
-      await ChatMessage.remove(toDelete);
-      return res.json({
-        success: true
-      })
+    }
+
+  @Get("/message/me")
+  async getAllMessagesOfThisUser(@Req() req: RequestWithUser, @Res() res: Response) {
+    const userId = req.user.id;
+    try {
+      let thisUserMessages = await ChatMessage.findBy(
+        {
+          user: Equal(userId)
+        }
+      )
+      return res.json(thisUserMessages)
     } catch(e) {
-        return res.status(404);
+      return res.status(404).json({
+        message: "not found"
+      })
     }
   }
 
-  @Patch("/message/:id")
-  async updateMessage(@Req() req: Request, @Res() res: Response) {
-    try {
-      const numberId = Number(req.params.id);
-      let toEdit = await ChatMessage.findOneBy(
-        {
-          id: Equal(numberId)
-        }
-      );
-      if (toEdit == null) {
-        return res.status(404);
-      }
-      toEdit.content = req.body.content;
-      await ChatMessage.save(toEdit);
-      return res.json({
-        seccess: true
-      })
-    } catch(e) {
+  @Post("/:conversationId/message")
+  async addMessage(@Req() req: RequestWithUser, @Res() res: Response) {
+    let id = Number(req.params.conversationId);
+    let conversation = await Conversation.findOneBy({id: id});
+    let user = await User.findOneBy({id: req.body.user.id});
+    if (conversation == null || user == null) {
       return res.status(404);
     }
+    let trimmedContent = req.body.content.trim();
+    if (trimmedContent == "") {
+      return res.status(422).send();
+    }
+      let message = new ChatMessage();
+      message.conversation = conversation;
+      message.content = req.body.content;
+      message.user = user;
+      try {
+        await ChatMessage.save(message);
+        return res.json({
+          ...message
+        })
+      } catch(e) {
+        return res.status(401).json({
+          message: "not found"
+        })
+      }
+  }
+
+  @Get("/conversation")
+  async getAllConversations(@Req() req: RequestWithUser, @Res() res: Response) {
+    const conversations = await Conversation.find({
+      relations: {
+        messages: true,
+        users: true
+      }
+    }
+    );
+    return res.json({
+      conversations: conversations
+    })
   }
 }
-
-export default ChatController;
